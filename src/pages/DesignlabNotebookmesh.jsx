@@ -83,6 +83,16 @@ function Model({ url, file, textures, meshSettings, onMeshesExtracted }) {
                 console.log(`3D Mesh (${meshName}) World Position: X: ${worldPos.x.toFixed(4)}, Y: ${worldPos.y.toFixed(4)}, Z: ${worldPos.z.toFixed(4)}`);
                 console.log(`3D Mesh (${meshName}) Local Position: X: ${mesh.position.x.toFixed(4)}, Y: ${mesh.position.y.toFixed(4)}, Z: ${mesh.position.z.toFixed(4)}`);
                 console.log(`3D Mesh (${meshName}) Scale: X: ${mesh.scale.x.toFixed(4)}, Y: ${mesh.scale.y.toFixed(4)}, Z: ${mesh.scale.z.toFixed(4)}`);
+                
+                let colorHex = 'N/A';
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) {
+                        colorHex = mesh.material.map(m => m.color ? '#' + m.color.getHexString() : 'N/A').join(', ');
+                    } else if (mesh.material.color) {
+                        colorHex = '#' + mesh.material.color.getHexString();
+                    }
+                }
+                console.log(`3D Mesh (${meshName}) Material Color: ${colorHex}`);
             } else {
                 console.log(`Mesh ${meshName} not found in 3D scene.`);
             }
@@ -100,6 +110,10 @@ function Model({ url, file, textures, meshSettings, onMeshesExtracted }) {
             if (!child.isMesh) return;
 
             const applyTexture = (mat, tex, settings) => {
+                if (settings && settings.color) {
+                    mat.color.set(settings.color);
+                }
+
                 if (tex) {
                     tex.wrapS = THREE.RepeatWrapping;
                     tex.wrapT = THREE.RepeatWrapping;
@@ -315,6 +329,7 @@ export default function DesignLabMeshPrint() {
         if (!selectedMesh) return;
         
         console.log(`\n--- Console Check for Mesh: ${selectedMesh} ---`);
+        console.log(`Selected Mesh Color: ${meshSettings[selectedMesh]?.color || 'Default (#ffffff)'}`);
         
         // Log Fabric JS Objects
         if (activeCanvas) {
@@ -366,6 +381,18 @@ export default function DesignLabMeshPrint() {
 
                 {selectedMesh && (
                     <>
+                        <div className="control-group" style={{ marginBottom: '15px' }}>
+                            <span className="control-label">Mesh Color:</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <input type="color" 
+                                    value={meshSettings[selectedMesh]?.color || '#ffffff'} 
+                                    onChange={(e) => handleUVSettingsChange('color', e.target.value)}
+                                    style={{ width: '40px', height: '40px', padding: '0', border: '1px solid #777', cursor: 'pointer' }}
+                                />
+                                <span style={{ fontSize: '0.85rem' }}>{meshSettings[selectedMesh]?.color || 'Default'}</span>
+                            </div>
+                        </div>
+
                         <div className="action-buttons">
                             <button className="action-btn" onClick={handleAddImage}><ImageIcon size={16} /> Add Image</button>
                             <button className="action-btn" onClick={handleAddText}><Type size={16} /> Add Text</button>
