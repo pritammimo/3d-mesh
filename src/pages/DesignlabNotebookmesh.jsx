@@ -334,9 +334,19 @@ export default function DesignLabMeshPrint() {
         // Log Fabric JS Objects
         if (activeCanvas) {
             const objects = activeCanvas.getObjects();
+            const canvasWidth = activeCanvas.width;
+            const canvasHeight = activeCanvas.height;
             console.log(`Fabric Canvas Objects (${objects.length}):`);
             objects.forEach((obj, idx) => {
+                const xPercentage = (obj.left / canvasWidth) * 100;
+                const yPercentage = (obj.top / canvasHeight) * 100;
+                const objWidth = obj.width * (obj.scaleX || 1);
+                const objHeight = obj.height * (obj.scaleY || 1);
+                const widthPercentage = (objWidth / canvasWidth) * 100;
+                const heightPercentage = (objHeight / canvasHeight) * 100;
+
                 console.log(`  [${idx}] Type: ${obj.type}, Left: ${obj.left?.toFixed(2)}, Top: ${obj.top?.toFixed(2)}, ScaleX: ${obj.scaleX?.toFixed(2)}, ScaleY: ${obj.scaleY?.toFixed(2)}, Angle: ${obj.angle}`);
+                console.log(`       xPercentage: ${xPercentage.toFixed(2)}%, yPercentage: ${yPercentage.toFixed(2)}%, widthPercentage: ${widthPercentage.toFixed(2)}%, heightPercentage: ${heightPercentage.toFixed(2)}%`);
             });
         }
         
