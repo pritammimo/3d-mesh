@@ -2,7 +2,7 @@ import React, { useState, useRef, Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Bounds } from '@react-three/drei';
 import * as THREE from 'three';
-import { Image as ImageIcon, Trash2, Type } from 'lucide-react';
+import { Image as ImageIcon, Trash2, Type, Download } from 'lucide-react';
 import { fabric } from 'fabric';
 import { Model, Loader } from './designplacementbypercentage';
 
@@ -10,7 +10,8 @@ export default function SecondaryView({
     meshes,
     selectedMainMesh,
     activePlacement,
-    models
+    models,
+    savedMeshData
 }) {
     const [selectedSecondaryMesh, setSelectedSecondaryMesh] = useState('');
     const secondaryFabricInstances = useRef({});
@@ -231,6 +232,44 @@ export default function SecondaryView({
             {/* BOTTOM: Secondary Controls */}
             <div style={{ flex: '1', padding: '15px', overflowY: 'auto' }}>
                 <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: '#fff' }}>Placement By Percentage</h3>
+
+                {/* Get All Button */}
+                <button
+                    onClick={() => {
+                        if (!savedMeshData || Object.keys(savedMeshData).length === 0) {
+                            alert('No saved mesh data yet. Use the Save button in Column 1 first.');
+                            return;
+                        }
+                        console.log('📦 ALL SAVED MESH DATA:');
+                        console.log(JSON.stringify(savedMeshData, null, 2));
+                    }}
+                    style={{
+                        width: '100%',
+                        marginBottom: '15px',
+                        padding: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        backgroundColor: '#16a34a',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    <Download size={16} /> Get All Saved Data
+                </button>
+
+                {savedMeshData && Object.keys(savedMeshData).length > 0 && (
+                    <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#1e3a2f', borderRadius: '5px', border: '1px solid #2d5a3f' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#4ade80' }}>
+                            {Object.keys(savedMeshData).length} mesh(es) saved: {Object.keys(savedMeshData).join(', ')}
+                        </span>
+                    </div>
+                )}
 
                 <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#2a2a2a', borderRadius: '5px', border: '1px solid #444' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>

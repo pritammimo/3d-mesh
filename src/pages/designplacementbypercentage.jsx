@@ -4,7 +4,7 @@ import { useGLTF, OrbitControls, Grid, Html, useProgress, Bounds } from '@react-
 import { Link } from 'react-router-dom';
 import * as THREE from 'three';
 import '../DesignLab.css';
-import { Image as ImageIcon, Trash2, Type, Upload, Copy } from 'lucide-react';
+import { Image as ImageIcon, Trash2, Type, Upload, Copy, Save } from 'lucide-react';
 import { fabric } from 'fabric';
 
 export function Loader() {
@@ -148,6 +148,9 @@ export default function DesignPlacementPercentage() {
     const [mainMeshSettings, setMainMeshSettings] = useState({});
 
     // Column 3 logic has been moved to SecondaryView component
+
+    // Saved mesh data for "Get All" in Column 3
+    const [savedMeshData, setSavedMeshData] = useState({});
 
     const handleModelUpload = (e) => {
         const file = e.target.files[0];
@@ -359,6 +362,54 @@ export default function DesignPlacementPercentage() {
         }));
     };
 
+    // Save current mesh's elements (percentage-based)
+    const handleSaveMeshData = () => {
+        if (!selectedMainMesh || !mainActiveCanvas) return;
+
+        const canvasWidth = mainActiveCanvas.width;
+        const canvasHeight = mainActiveCanvas.height;
+        const color = mainMeshSettings[selectedMainMesh]?.color || '#ffffff';
+
+        const elements = mainActiveCanvas.getObjects().map(obj => {
+            const objWidth = obj.width * (obj.scaleX || 1);
+            const objHeight = obj.height * (obj.scaleY || 1);
+
+            // Normalize to top-left origin
+            let adjustedLeft = obj.left;
+            let adjustedTop = obj.top;
+            if (obj.originX === 'center') adjustedLeft -= objWidth / 2;
+            else if (obj.originX === 'right') adjustedLeft -= objWidth;
+            if (obj.originY === 'center') adjustedTop -= objHeight / 2;
+            else if (obj.originY === 'bottom') adjustedTop -= objHeight;
+
+            const base = {
+                angle: Number((obj.angle || 0).toFixed(2)),
+                h: Number(((objHeight / canvasHeight) * 100).toFixed(2)),
+                w: Number(((objWidth / canvasWidth) * 100).toFixed(2)),
+                x: Number(((adjustedLeft / canvasWidth) * 100).toFixed(2)),
+                y: Number(((adjustedTop / canvasHeight) * 100).toFixed(2)),
+            };
+
+            if (obj.type === 'i-text' || obj.type === 'text') {
+                return { ...base, type: 'text', text: obj.text };
+            } else if (obj.type === 'image') {
+                return { ...base, type: 'image' };
+            } else {
+                return { ...base, type: obj.type };
+            }
+        });
+
+        setSavedMeshData(prev => ({
+            ...prev,
+            [selectedMainMesh]: {
+                color,
+                elements
+            }
+        }));
+
+        console.log(`✅ Saved mesh "${selectedMainMesh}" with ${elements.length} element(s)`);
+    };
+
 
     return (
         <div style={{ display: 'flex', flexDirection: 'row', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#111', color: '#fff' }}>
@@ -447,6 +498,30 @@ export default function DesignPlacementPercentage() {
                         </div>
                     </>
                 )}
+
+                {selectedMainMesh && (
+                    <button
+                        onClick={handleSaveMeshData}
+                        style={{
+                            width: '100%',
+                            marginTop: '15px',
+                            padding: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            backgroundColor: '#2563eb',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        <Save size={16} /> Save Mesh Data
+                    </button>
+                )}
             </div>
 
             {/* COLUMN 2: Main 3D Canvas */}
@@ -480,6 +555,7 @@ export default function DesignPlacementPercentage() {
                 selectedMainMesh={selectedMainMesh}
                 activePlacement={activePlacement}
                 models={predefinedModel}
+                savedMeshData={savedMeshData}
             />
 
 
