@@ -1,0 +1,282 @@
+.design-lab-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #222222;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+.canvas-section {
+  flex: 1;
+  position: relative;
+  height: 100%;
+}
+
+.controls-section {
+  flex: 0 0 45%;
+  max-width: 800px;
+  min-width: 400px;
+  background-color: #333333;
+  border-left: 2px solid #555;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.controls-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.controls-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  font-weight: normal;
+}
+
+.back-btn {
+  background: none;
+  border: 1px solid #555;
+  color: #ccc;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.back-btn:hover {
+  background-color: #444;
+}
+
+.control-group {
+  margin-bottom: 15px;
+}
+
+.control-label {
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.colors-palette {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+
+.color-swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px #555;
+}
+
+.color-swatch:hover, .color-swatch.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.accordion-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: transparent;
+  border: 1px solid #777;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.accordion-btn:hover {
+  background-color: #444;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-container input[type="range"] {
+  flex: 1;
+}
+
+.angles-grid {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.angle-btn {
+  background-color: transparent;
+  border: 1px solid #777;
+  color: #fff;
+  padding: 8px;
+  cursor: pointer;
+  min-width: 40px;
+  text-align: center;
+}
+
+.angle-btn:hover, .angle-btn.active {
+  background-color: #555;
+}
+
+.custom-angle-btn {
+  width: 100%;
+  padding: 8px;
+  background-color: transparent;
+  border: 1px solid #777;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.bg-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bg-picker input[type="color"] {
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #fff;
+}
+
+.bg-picker input[type="text"] {
+  background-color: #222;
+  border: 1px solid #555;
+  color: #fff;
+  padding: 5px;
+  width: 80px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 10px;
+  background-color: transparent;
+  border: 1px solid #777;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-btn:hover {
+  background-color: #444;
+}
+
+.image-preview {
+  width: 100%;
+  height: 400px;
+  background-color: #fff;
+  background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), 
+                    linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+                    linear-gradient(45deg, transparent 75%, #ccc 75%), 
+                    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  border: 2px solid #555;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.fabric-container {
+  width: 100%;
+  height: 100%;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.icon-btn {
+  background-color: transparent;
+  border: 1px solid #777;
+  color: #fff;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.icon-btn:hover {
+  background-color: #555;
+}
+
+.opacity-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1024px) {
+  .design-lab-container {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  
+  .canvas-section {
+    flex: none;
+    height: 50vh;
+    min-height: 400px;
+    width: 100%;
+  }
+  
+  .controls-section {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    border-left: none;
+    border-top: 2px solid #555;
+    height: auto;
+    overflow-y: visible;
+  }
+}
