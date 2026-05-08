@@ -1,6 +1,6 @@
 import React, { useState, useRef, Suspense, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Grid, Html, useProgress } from '@react-three/drei';
+import { useGLTF, OrbitControls, Grid, Html, useProgress, Bounds } from '@react-three/drei';
 import { Link } from 'react-router-dom';
 import * as THREE from 'three';
 import '../DesignLab.css';
@@ -13,7 +13,7 @@ export function Loader() {
 }
 
 export function Model({ url, file, textures, meshSettings, onMeshesExtracted }) {
-    const [modelUrl, setModelUrl] = useState(url || '/models/Notebook.glb');
+    const [modelUrl, setModelUrl] = useState(url || '/models/oversized_tshirt.glb');
 
     useEffect(() => {
         if (file) {
@@ -21,7 +21,7 @@ export function Model({ url, file, textures, meshSettings, onMeshesExtracted }) 
             setModelUrl(newUrl);
             return () => URL.revokeObjectURL(newUrl);
         } else {
-            setModelUrl(url || '/models/Notebook.glb');
+            setModelUrl(url || '/models/oversized_tshirt.glb');
         }
     }, [file, url]);
 
@@ -137,6 +137,7 @@ export default function DesignPlacementPercentage() {
     const [modelFile, setModelFile] = useState(null);
     const [meshes, setMeshes] = useState([]);
     const [activePlacement, setActivePlacement] = useState(null);
+    const predefinedModel = "/models/oversized_tshirt.glb";
 
     // Column 1 (Main)
     const [selectedMainMesh, setSelectedMainMesh] = useState('');
@@ -455,16 +456,18 @@ export default function DesignPlacementPercentage() {
                     <directionalLight position={[5, 5, 5]} intensity={1} />
                     <directionalLight position={[-5, 5, -5]} intensity={0.5} />
                     <Suspense fallback={<Loader />}>
-                        <Model
-                            url="/models/Notebook.glb"
-                            file={modelFile}
-                            textures={mainTextures}
-                            meshSettings={mainMeshSettings}
-                            onMeshesExtracted={handleMeshesExtracted}
-                        />
+                        <Bounds fit clip observe margin={1.5}>
+                            <Model
+                                url="/models/oversized_tshirt.glb"
+                                file={modelFile}
+                                textures={mainTextures}
+                                meshSettings={mainMeshSettings}
+                                onMeshesExtracted={handleMeshesExtracted}
+                            />
+                        </Bounds>
                     </Suspense>
                     <Grid position={[0, -1, 0]} args={[10.5, 10.5]} cellSize={0.5} cellThickness={1} cellColor="#555555" sectionSize={2.5} sectionThickness={1.5} sectionColor="#666666" fadeDistance={20} />
-                    <OrbitControls enablePan={true} enableZoom={true} />
+                    <OrbitControls enablePan={true} enableZoom={true} makeDefault />
                 </Canvas>
                 <div style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.5)', padding: '5px 10px', borderRadius: '5px', pointerEvents: 'none' }}>
                     Main View
@@ -476,7 +479,10 @@ export default function DesignPlacementPercentage() {
                 meshes={meshes}
                 selectedMainMesh={selectedMainMesh}
                 activePlacement={activePlacement}
+                models={predefinedModel}
             />
+
+
         </div>
     );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useRef, Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Bounds } from '@react-three/drei';
 import * as THREE from 'three';
 import { Image as ImageIcon, Trash2, Type } from 'lucide-react';
 import { fabric } from 'fabric';
@@ -9,7 +9,8 @@ import { Model, Loader } from './designplacementbypercentage';
 export default function SecondaryView({
     meshes,
     selectedMainMesh,
-    activePlacement
+    activePlacement,
+    models
 }) {
     const [selectedSecondaryMesh, setSelectedSecondaryMesh] = useState('');
     const secondaryFabricInstances = useRef({});
@@ -19,7 +20,9 @@ export default function SecondaryView({
     const [secondaryMeshSettings, setSecondaryMeshSettings] = useState({});
     const [copiedPlacement, setCopiedPlacement] = useState(null);
     const [secondaryTextInput, setSecondaryTextInput] = useState('Text');
-
+    console.log("meshes", meshes)
+    console.log("selected", selectedMainMesh);
+    console.log("activePlacement", activePlacement)
     // Reset when meshes change (new model loaded)
     useEffect(() => {
         setSelectedSecondaryMesh('');
@@ -180,7 +183,7 @@ export default function SecondaryView({
         };
         input.click();
     };
-
+    //const models = '/models/Mug.glb'
     const handleSecondaryDelete = () => {
         if (!secondaryActiveCanvas) return;
         const activeObjects = secondaryActiveCanvas.getActiveObjects();
@@ -210,13 +213,15 @@ export default function SecondaryView({
                     <directionalLight position={[5, 5, 5]} intensity={1} />
                     <directionalLight position={[-5, 5, -5]} intensity={0.5} />
                     <Suspense fallback={<Loader />}>
-                        <Model
-                            url="/models/Notebook.glb"
-                            textures={secondaryTextures}
-                            meshSettings={secondaryMeshSettings}
-                        />
+                        <Bounds fit clip observe margin={1.5}>
+                            <Model
+                                url={models}
+                                textures={secondaryTextures}
+                                meshSettings={secondaryMeshSettings}
+                            />
+                        </Bounds>
                     </Suspense>
-                    <OrbitControls enablePan={true} enableZoom={true} />
+                    <OrbitControls enablePan={true} enableZoom={true} makeDefault />
                 </Canvas>
                 <div style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.5)', padding: '5px 10px', borderRadius: '5px', pointerEvents: 'none', color: '#fff' }}>
                     Secondary View
