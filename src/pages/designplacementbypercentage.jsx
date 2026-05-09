@@ -13,7 +13,7 @@ export function Loader() {
 }
 
 export function Model({ url, file, textures, meshSettings, onMeshesExtracted }) {
-    const [modelUrl, setModelUrl] = useState(url || '/models/oversized_tshirt.glb');
+    const [modelUrl, setModelUrl] = useState(url || '/models/Mug.glb');
 
     useEffect(() => {
         if (file) {
@@ -21,7 +21,7 @@ export function Model({ url, file, textures, meshSettings, onMeshesExtracted }) 
             setModelUrl(newUrl);
             return () => URL.revokeObjectURL(newUrl);
         } else {
-            setModelUrl(url || '/models/oversized_tshirt.glb');
+            setModelUrl(url || '/models/Mug.glb');
         }
     }, [file, url]);
 
@@ -137,7 +137,7 @@ export default function DesignPlacementPercentage() {
     const [modelFile, setModelFile] = useState(null);
     const [meshes, setMeshes] = useState([]);
     const [activePlacement, setActivePlacement] = useState(null);
-    const predefinedModel = "/models/oversized_tshirt.glb";
+    const predefinedModel = "/models/Mug.glb";
 
     // Column 1 (Main)
     const [selectedMainMesh, setSelectedMainMesh] = useState('');
@@ -533,7 +533,7 @@ export default function DesignPlacementPercentage() {
                     <Suspense fallback={<Loader />}>
                         <Bounds fit clip observe margin={1.5}>
                             <Model
-                                url="/models/oversized_tshirt.glb"
+                                url="/models/Mug.glb"
                                 file={modelFile}
                                 textures={mainTextures}
                                 meshSettings={mainMeshSettings}

@@ -2,7 +2,7 @@ import React, { useState, useRef, Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Bounds } from '@react-three/drei';
 import * as THREE from 'three';
-import { Image as ImageIcon, Trash2, Type, Download } from 'lucide-react';
+import { Image as ImageIcon, Trash2, Type, Download, Palette } from 'lucide-react';
 import { fabric } from 'fabric';
 import { Model, Loader } from './designplacementbypercentage';
 
@@ -20,6 +20,11 @@ export default function SecondaryView({
     const [secondaryActiveCanvas, setSecondaryActiveCanvas] = useState(null);
     const [secondaryMeshSettings, setSecondaryMeshSettings] = useState({});
     const [secondaryTextInput, setSecondaryTextInput] = useState('Text');
+
+    // Text styling
+    const [textFont, setTextFont] = useState('Arial');
+    const [textColor, setTextColor] = useState('#1E90FF');
+    const loadedFontsRef = useRef(new Set(['Arial']));
 
     // Controls are hidden until "Get All" is clicked
     const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -136,7 +141,26 @@ export default function SecondaryView({
         }
     };
 
-    const handleSecondaryAddText = () => {
+    // Load a Google Font dynamically
+    const loadGoogleFont = (fontName) => {
+        if (loadedFontsRef.current.has(fontName)) return Promise.resolve();
+        return new Promise((resolve) => {
+            const link = document.createElement('link');
+            link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}&display=swap`;
+            link.rel = 'stylesheet';
+            link.onload = () => {
+                loadedFontsRef.current.add(fontName);
+                resolve();
+            };
+            link.onerror = () => {
+                console.warn(`Failed to load font: ${fontName}`);
+                resolve();
+            };
+            document.head.appendChild(link);
+        });
+    };
+
+    const handleSecondaryAddText = async () => {
         if (!secondaryActiveCanvas) return;
         const elementPos = getCurrentElementPosition();
         if (!elementPos) {
@@ -144,12 +168,15 @@ export default function SecondaryView({
             return;
         }
 
+        // Load the Google Font first
+        await loadGoogleFont(textFont);
+
         const canvasWidth = secondaryActiveCanvas.width;
         const canvasHeight = secondaryActiveCanvas.height;
 
         const text = new fabric.IText(secondaryTextInput, {
-            fontFamily: 'Arial',
-            fill: '#1E90FF',
+            fontFamily: textFont,
+            fill: textColor,
             fontSize: 40
         });
 
@@ -166,15 +193,42 @@ export default function SecondaryView({
             top: (elementPos.y / 100) * canvasHeight,
             angle: elementPos.angle || 0,
             originX: 'left',
-            originY: 'top'
+            originY: 'top',
+            hasControls: false,
+            hasBorders: false,
+            selectable: true
         });
 
         secondaryActiveCanvas.add(text);
-        secondaryActiveCanvas.setActiveObject(text);
+        secondaryActiveCanvas.discardActiveObject();
         secondaryActiveCanvas.renderAll();
 
         // Advance to next element position
         setCurrentElementIndex(prev => prev + 1);
+    };
+
+    // Change font of the currently selected text object
+    const handleChangeFontOnSelected = async () => {
+        if (!secondaryActiveCanvas) return;
+        const obj = secondaryActiveCanvas.getActiveObject();
+        if (!obj || (obj.type !== 'i-text' && obj.type !== 'text')) {
+            alert('Please select a text object first.');
+            return;
+        }
+        await loadGoogleFont(textFont);
+        obj.set('fontFamily', textFont);
+        secondaryActiveCanvas.renderAll();
+    };
+
+    // Change color of the currently selected text object
+    const handleChangeColorOnSelected = (color) => {
+        setTextColor(color);
+        if (!secondaryActiveCanvas) return;
+        const obj = secondaryActiveCanvas.getActiveObject();
+        if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+            obj.set('fill', color);
+            secondaryActiveCanvas.renderAll();
+        }
     };
 
     const handleSecondaryAddImage = () => {
@@ -210,11 +264,14 @@ export default function SecondaryView({
                         top: (elementPos.y / 100) * canvasHeight,
                         angle: elementPos.angle || 0,
                         originX: 'left',
-                        originY: 'top'
+                        originY: 'top',
+                        hasControls: false,
+                        hasBorders: false,
+                        selectable: true
                     });
 
                     secondaryActiveCanvas.add(img);
-                    secondaryActiveCanvas.setActiveObject(img);
+                    secondaryActiveCanvas.discardActiveObject();
                     secondaryActiveCanvas.renderAll();
 
                     // Advance to next element position
@@ -355,7 +412,6 @@ export default function SecondaryView({
                                     )}
                                 </div>
 
-                                {/* Add controls - only if there are positions left */}
                                 {currentElement && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
                                         <button onClick={handleSecondaryAddImage} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '8px', backgroundColor: '#333', color: '#fff', border: '1px solid #555', borderRadius: '5px', cursor: 'pointer' }}>
@@ -376,6 +432,43 @@ export default function SecondaryView({
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Text Font & Color Controls */}
+                                <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#2a2a2a', borderRadius: '5px', border: '1px solid #444' }}>
+                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#aaa' }}>
+                                        <Palette size={14} style={{ marginRight: '5px', verticalAlign: 'middle' }} />
+                                        Text Styling
+                                    </h4>
+
+                                    {/* Font Input */}
+                                    <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
+                                        <input
+                                            type="text"
+                                            value={textFont}
+                                            onChange={(e) => setTextFont(e.target.value)}
+                                            placeholder="Google Font name..."
+                                            style={{ flex: 1, padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px', fontSize: '0.85rem' }}
+                                        />
+                                        <button
+                                            onClick={handleChangeFontOnSelected}
+                                            style={{ flex: '0 0 auto', padding: '8px 12px', backgroundColor: '#6d28d9', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                                        >
+                                            Apply Font
+                                        </button>
+                                    </div>
+
+                                    {/* Text Color */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Text Color:</span>
+                                        <input
+                                            type="color"
+                                            value={textColor}
+                                            onChange={(e) => handleChangeColorOnSelected(e.target.value)}
+                                            style={{ width: '36px', height: '36px', padding: '0', border: '1px solid #555', cursor: 'pointer', borderRadius: '5px' }}
+                                        />
+                                        <span style={{ fontSize: '0.8rem', color: '#fff', fontFamily: 'monospace' }}>{textColor}</span>
+                                    </div>
+                                </div>
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                                     <button onClick={handleSecondaryDelete} title="Delete" style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
