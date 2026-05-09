@@ -4,7 +4,7 @@ import { useGLTF, OrbitControls, Grid, Html, useProgress, Bounds } from '@react-
 import { Link } from 'react-router-dom';
 import * as THREE from 'three';
 import '../DesignLab.css';
-import { Image as ImageIcon, Trash2, Type, Upload, Copy, Save } from 'lucide-react';
+import { Image as ImageIcon, Trash2, Type, Upload, Copy, Save, ToggleLeft, ToggleRight } from 'lucide-react';
 import { fabric } from 'fabric';
 
 export function Loader() {
@@ -152,6 +152,9 @@ export default function DesignPlacementPercentage() {
     // Saved mesh data for "Get All" in Column 3
     const [savedMeshData, setSavedMeshData] = useState({});
 
+    // Track if the currently selected object is marked as default
+    const [isDefaultActive, setIsDefaultActive] = useState(false);
+
     const handleModelUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -259,8 +262,12 @@ export default function DesignPlacementPercentage() {
                     originX: 'left',
                     originY: 'top'
                 });
+
+                // Read isDefault custom property
+                setIsDefaultActive(!!obj.isDefault);
             } else {
                 setActivePlacement(null);
+                setIsDefaultActive(false);
             }
         };
 
@@ -388,6 +395,7 @@ export default function DesignPlacementPercentage() {
                 w: Number(((objWidth / canvasWidth) * 100).toFixed(2)),
                 x: Number(((adjustedLeft / canvasWidth) * 100).toFixed(2)),
                 y: Number(((adjustedTop / canvasHeight) * 100).toFixed(2)),
+                isDefault: !!obj.isDefault
             };
 
             if (obj.type === 'i-text' || obj.type === 'text') {
@@ -465,6 +473,28 @@ export default function DesignPlacementPercentage() {
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', padding: '10px', backgroundColor: '#222', borderRadius: '5px' }}>
                             <button onClick={handleMainDelete} title="Delete" style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
+
+                            {/* isDefault Toggle */}
+                            <button
+                                onClick={() => {
+                                    if (!mainActiveCanvas) return;
+                                    const obj = mainActiveCanvas.getActiveObject();
+                                    if (!obj) { alert('Select an object first.'); return; }
+                                    obj.isDefault = !obj.isDefault;
+                                    setIsDefaultActive(obj.isDefault);
+                                }}
+                                title={isDefaultActive ? 'Remove Default' : 'Set as Default'}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '5px',
+                                    padding: '4px 10px', border: 'none', borderRadius: '5px', cursor: 'pointer',
+                                    backgroundColor: isDefaultActive ? '#16a34a' : '#555',
+                                    color: '#fff', fontSize: '0.75rem', fontWeight: 'bold'
+                                }}
+                            >
+                                {isDefaultActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                                {isDefaultActive ? 'Default ON' : 'Default OFF'}
+                            </button>
+
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={{ fontSize: '0.8rem' }}>Opacity:</span>
                                 <input type="range" min="0" max="1" step="0.1" defaultValue="1" onChange={handleMainOpacityChange} />
@@ -556,6 +586,7 @@ export default function DesignPlacementPercentage() {
                 activePlacement={activePlacement}
                 models={predefinedModel}
                 savedMeshData={savedMeshData}
+                mainCanvasWidth={mainContainerRef.current?.clientWidth || 300}
             />
 
 

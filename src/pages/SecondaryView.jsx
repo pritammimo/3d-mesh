@@ -11,7 +11,8 @@ export default function SecondaryView({
     selectedMainMesh,
     activePlacement,
     models,
-    savedMeshData
+    savedMeshData,
+    mainCanvasWidth
 }) {
     const [selectedSecondaryMesh, setSelectedSecondaryMesh] = useState('');
     const secondaryFabricInstances = useRef({});
@@ -49,11 +50,12 @@ export default function SecondaryView({
         if (!selectedSecondaryMesh || !secondaryContainerRef.current) return;
         if (!secondaryFabricInstances.current[selectedSecondaryMesh]) {
             const canvasEl = document.createElement('canvas');
-            canvasEl.width = 300;
+            const cWidth = mainCanvasWidth || 300;
+            canvasEl.width = cWidth;
             canvasEl.height = 300;
 
             const fCanvas = new fabric.Canvas(canvasEl, {
-                width: 300,
+                width: cWidth,
                 height: 300,
                 backgroundColor: '#ffffff'
             });
@@ -103,13 +105,110 @@ export default function SecondaryView({
         setCurrentElementIndex(0);
     }, [selectedSecondaryMesh, isDataLoaded, loadedData]);
 
-    // Get the current element position from loaded data for the selected mesh
+    // Get the current NON-default element position from loaded data
     const getCurrentElementPosition = () => {
         if (!loadedData || !selectedSecondaryMesh) return null;
         const meshEntry = loadedData[selectedSecondaryMesh];
         if (!meshEntry || !meshEntry.elements || meshEntry.elements.length === 0) return null;
-        if (currentElementIndex >= meshEntry.elements.length) return null;
-        return meshEntry.elements[currentElementIndex];
+        // Filter only non-default elements
+        const nonDefaultElements = meshEntry.elements.filter(el => !el.isDefault);
+        if (currentElementIndex >= nonDefaultElements.length) return null;
+        return nonDefaultElements[currentElementIndex];
+    };
+
+    // Place default elements on a specific mesh's canvas
+    const placeDefaultElementsOnMesh = (meshName, meshData) => {
+        // Ensure canvas exists for this mesh
+        if (!secondaryFabricInstances.current[meshName]) {
+            const canvasEl = document.createElement('canvas');
+            const cWidth = mainCanvasWidth || 300;
+            canvasEl.width = cWidth;
+            canvasEl.height = 300;
+
+            const fCanvas = new fabric.Canvas(canvasEl, {
+                width: cWidth,
+                height: 300,
+                backgroundColor: '#ffffff'
+            });
+
+            const texture = new THREE.CanvasTexture(fCanvas.getElement());
+            texture.anisotropy = 16;
+
+            fCanvas.on('after:render', () => {
+                texture.needsUpdate = true;
+                setSecondaryTextures(prev => ({ ...prev, [meshName]: texture }));
+            });
+
+            secondaryFabricInstances.current[meshName] = {
+                canvas: fCanvas,
+                texture: texture,
+                htmlElement: canvasEl
+            };
+
+            setSecondaryTextures(prev => ({ ...prev, [meshName]: texture }));
+        }
+
+        const fCanvas = secondaryFabricInstances.current[meshName].canvas;
+        const canvasWidth = fCanvas.width;
+        const canvasHeight = fCanvas.height;
+
+        const defaultElements = meshData.elements.filter(el => el.isDefault);
+
+        defaultElements.forEach(elementPos => {
+            if (elementPos.type === 'text' && elementPos.text) {
+                const text = new fabric.IText(elementPos.text, {
+                    fontFamily: 'Arial',
+                    fill: '#1E90FF',
+                    fontSize: 40
+                });
+
+                const targetW = (elementPos.w / 100) * canvasWidth;
+                const targetH = (elementPos.h / 100) * canvasHeight;
+
+                text.set({
+                    scaleX: targetW / text.width,
+                    scaleY: targetH / text.height,
+                    left: (elementPos.x / 100) * canvasWidth,
+                    top: (elementPos.y / 100) * canvasHeight,
+                    angle: elementPos.angle || 0,
+                    originX: 'left',
+                    originY: 'top',
+                    hasControls: false,
+                    hasBorders: false,
+                    selectable: false,
+                    evented: false,
+                    isDefaultPlaced: true
+                });
+
+                fCanvas.add(text);
+            } else if (elementPos.type === 'image') {
+                fabric.Image.fromURL('https://placehold.co/600x400/000000/FFF', (img) => {
+                    const targetW = (elementPos.w / 100) * canvasWidth;
+                    const targetH = (elementPos.h / 100) * canvasHeight;
+
+                    img.set({
+                        scaleX: targetW / img.width,
+                        scaleY: targetH / img.height,
+                        left: (elementPos.x / 100) * canvasWidth,
+                        top: (elementPos.y / 100) * canvasHeight,
+                        angle: elementPos.angle || 0,
+                        originX: 'left',
+                        originY: 'top',
+                        hasControls: false,
+                        hasBorders: false,
+                        selectable: false,
+                        evented: false,
+                        isDefaultPlaced: true
+                    });
+
+                    fCanvas.add(img);
+                    fCanvas.renderAll();
+                }, { crossOrigin: 'anonymous' });
+            }
+        });
+
+        fCanvas.discardActiveObject();
+        fCanvas.renderAll();
     };
 
     const handleGetAllData = () => {
@@ -134,6 +233,11 @@ export default function SecondaryView({
             }
         });
         setSecondaryMeshSettings(prev => ({ ...prev, ...allColorSettings }));
+
+        // Auto-place default elements on ALL meshes
+        savedMeshNames.forEach(meshName => {
+            placeDefaultElementsOnMesh(meshName, savedMeshData[meshName]);
+        });
 
         // Auto-select the first saved mesh
         if (savedMeshNames.length > 0) {
@@ -292,12 +396,13 @@ export default function SecondaryView({
         }
     };
 
-    // Get saved meshes list and current element info
+    // Get saved meshes list and current element info (non-defaults only)
     const savedMeshNames = loadedData ? Object.keys(loadedData) : [];
     const currentElement = getCurrentElementPosition();
-    const totalElements = loadedData && selectedSecondaryMesh && loadedData[selectedSecondaryMesh]
-        ? loadedData[selectedSecondaryMesh].elements.length
-        : 0;
+    const nonDefaultElements = loadedData && selectedSecondaryMesh && loadedData[selectedSecondaryMesh]
+        ? loadedData[selectedSecondaryMesh].elements.filter(el => !el.isDefault)
+        : [];
+    const totalElements = nonDefaultElements.length;
 
     return (
         <div style={{ flex: '1', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', backgroundColor: '#1a1a1a' }}>
