@@ -2,9 +2,33 @@ import React, { useState, useRef, Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Bounds } from '@react-three/drei';
 import * as THREE from 'three';
-import { Image as ImageIcon, Trash2, Type, Download, Palette } from 'lucide-react';
+import { Image as ImageIcon, Trash2, Type, Download, Palette, PenTool, User, SlidersHorizontal } from 'lucide-react';
 import { fabric } from 'fabric';
 import { Model, Loader } from './designplacementbypercentage';
+
+const FILTER_OPTIONS = [
+    { label: 'None', value: 'none' },
+    { label: 'Grayscale', value: 'grayscale' },
+    { label: 'Sepia', value: 'sepia' },
+    { label: 'Invert', value: 'invert' },
+    { label: 'Brightness (+)', value: 'brightness' },
+    { label: 'Contrast (+)', value: 'contrast' },
+    { label: 'Blur', value: 'blur' },
+    { label: 'Saturate', value: 'saturate' },
+];
+
+function getFilterInstance(filterName) {
+    switch (filterName) {
+        case 'grayscale': return new fabric.Image.filters.Grayscale();
+        case 'sepia': return new fabric.Image.filters.Sepia();
+        case 'invert': return new fabric.Image.filters.Invert();
+        case 'brightness': return new fabric.Image.filters.Brightness({ brightness: 0.3 });
+        case 'contrast': return new fabric.Image.filters.Contrast({ contrast: 0.3 });
+        case 'blur': return new fabric.Image.filters.Blur({ blur: 0.2 });
+        case 'saturate': return new fabric.Image.filters.Saturation({ saturation: 0.5 });
+        default: return null;
+    }
+}
 
 export default function SecondaryView({
     meshes,
@@ -14,13 +38,13 @@ export default function SecondaryView({
     savedMeshData,
     mainCanvasWidth
 }) {
+    console.log("sa", savedMeshData)
     const [selectedSecondaryMesh, setSelectedSecondaryMesh] = useState('');
     const secondaryFabricInstances = useRef({});
     const secondaryContainerRef = useRef(null);
     const [secondaryTextures, setSecondaryTextures] = useState({});
     const [secondaryActiveCanvas, setSecondaryActiveCanvas] = useState(null);
     const [secondaryMeshSettings, setSecondaryMeshSettings] = useState({});
-    const [secondaryTextInput, setSecondaryTextInput] = useState('Text');
 
     // Text styling
     const [textFont, setTextFont] = useState('Arial');
@@ -31,8 +55,12 @@ export default function SecondaryView({
     const [isDataLoaded, setIsDataLoaded] = useState(false);
     const [loadedData, setLoadedData] = useState(null);
 
-    // Track which element index to place next for the selected mesh
-    const [currentElementIndex, setCurrentElementIndex] = useState(0);
+    // Global inputs for the 4 categories
+    const [customerText, setCustomerText] = useState('');
+    const [customerName, setCustomerName] = useState('');
+    // Image filter for right column uploads
+    const [mainCanvasFilter, setMainCanvasFilter] = useState('none');
+    const [artistSignatureFilter, setArtistSignatureFilter] = useState('none');
 
     // Reset when meshes change (new model loaded)
     useEffect(() => {
@@ -42,7 +70,6 @@ export default function SecondaryView({
         setSecondaryActiveCanvas(null);
         setIsDataLoaded(false);
         setLoadedData(null);
-        setCurrentElementIndex(0);
     }, [meshes]);
 
     // Initialize Secondary Canvas
@@ -101,24 +128,10 @@ export default function SecondaryView({
                 }
             }));
         }
-        // Reset element index when switching meshes
-        setCurrentElementIndex(0);
     }, [selectedSecondaryMesh, isDataLoaded, loadedData]);
 
-    // Get the current NON-default element position from loaded data
-    const getCurrentElementPosition = () => {
-        if (!loadedData || !selectedSecondaryMesh) return null;
-        const meshEntry = loadedData[selectedSecondaryMesh];
-        if (!meshEntry || !meshEntry.elements || meshEntry.elements.length === 0) return null;
-        // Filter only non-default elements
-        const nonDefaultElements = meshEntry.elements.filter(el => !el.isDefault);
-        if (currentElementIndex >= nonDefaultElements.length) return null;
-        return nonDefaultElements[currentElementIndex];
-    };
-
-    // Place default elements on a specific mesh's canvas
-    const placeDefaultElementsOnMesh = (meshName, meshData) => {
-        // Ensure canvas exists for this mesh
+    // Ensure a canvas exists for a given mesh name
+    const ensureCanvasForMesh = (meshName) => {
         if (!secondaryFabricInstances.current[meshName]) {
             const canvasEl = document.createElement('canvas');
             const cWidth = mainCanvasWidth || 300;
@@ -147,8 +160,12 @@ export default function SecondaryView({
 
             setSecondaryTextures(prev => ({ ...prev, [meshName]: texture }));
         }
+        return secondaryFabricInstances.current[meshName].canvas;
+    };
 
-        const fCanvas = secondaryFabricInstances.current[meshName].canvas;
+    // Place default elements on a specific mesh's canvas
+    const placeDefaultElementsOnMesh = (meshName, meshData) => {
+        const fCanvas = ensureCanvasForMesh(meshName);
         const canvasWidth = fCanvas.width;
         const canvasHeight = fCanvas.height;
 
@@ -157,8 +174,8 @@ export default function SecondaryView({
         defaultElements.forEach(elementPos => {
             if (elementPos.type === 'text' && elementPos.text) {
                 const text = new fabric.IText(elementPos.text, {
-                    fontFamily: 'Arial',
-                    fill: '#1E90FF',
+                    fontFamily: elementPos.fontFamily || 'Arial',
+                    fill: elementPos.fill || '#1E90FF',
                     fontSize: 40
                 });
 
@@ -177,14 +194,24 @@ export default function SecondaryView({
                     hasBorders: false,
                     selectable: false,
                     evented: false,
-                    isDefaultPlaced: true
+                    isDefaultPlaced: true,
+                    elementTag: elementPos.elementTag || ''
                 });
 
                 fCanvas.add(text);
             } else if (elementPos.type === 'image') {
-                fabric.Image.fromURL('https://placehold.co/600x400/000000/FFF', (img) => {
+                fabric.Image.fromURL('https://placehold.co/400x400/png', (img) => {
                     const targetW = (elementPos.w / 100) * canvasWidth;
                     const targetH = (elementPos.h / 100) * canvasHeight;
+
+                    // Apply saved filter
+                    if (elementPos.imageFilter && elementPos.imageFilter !== 'none') {
+                        const filterInst = getFilterInstance(elementPos.imageFilter);
+                        if (filterInst) {
+                            img.filters = [filterInst];
+                            img.applyFilters();
+                        }
+                    }
 
                     img.set({
                         scaleX: targetW / img.width,
@@ -198,7 +225,8 @@ export default function SecondaryView({
                         hasBorders: false,
                         selectable: false,
                         evented: false,
-                        isDefaultPlaced: true
+                        isDefaultPlaced: true,
+                        elementTag: elementPos.elementTag || ''
                     });
 
                     fCanvas.add(img);
@@ -222,7 +250,7 @@ export default function SecondaryView({
         setLoadedData(savedMeshData);
         setIsDataLoaded(true);
 
-        // Apply ALL saved mesh colors at once to the secondary 3D model
+        // Apply ALL saved mesh colors at once
         const allColorSettings = {};
         const savedMeshNames = Object.keys(savedMeshData);
         savedMeshNames.forEach(meshName => {
@@ -264,82 +292,25 @@ export default function SecondaryView({
         });
     };
 
-    const handleSecondaryAddText = async () => {
-        if (!secondaryActiveCanvas) return;
-        const elementPos = getCurrentElementPosition();
-        if (!elementPos) {
-            alert('No more saved element positions available for this mesh.');
-            return;
-        }
-
-        // Load the Google Font first
-        await loadGoogleFont(textFont);
-
-        const canvasWidth = secondaryActiveCanvas.width;
-        const canvasHeight = secondaryActiveCanvas.height;
-
-        const text = new fabric.IText(secondaryTextInput, {
-            fontFamily: textFont,
-            fill: textColor,
-            fontSize: 40
+    // Find all tagged NON-default positions across all meshes
+    const findTaggedPositions = (tag) => {
+        if (!loadedData) return [];
+        const results = [];
+        Object.entries(loadedData).forEach(([meshName, meshData]) => {
+            meshData.elements.forEach(el => {
+                if (el.elementTag === tag && !el.isDefault) {
+                    results.push({ meshName, element: el });
+                }
+            });
         });
-
-        const targetW = (elementPos.w / 100) * canvasWidth;
-        const targetH = (elementPos.h / 100) * canvasHeight;
-
-        const scaleX = targetW / text.width;
-        const scaleY = targetH / text.height;
-
-        text.set({
-            scaleX: scaleX,
-            scaleY: scaleY,
-            left: (elementPos.x / 100) * canvasWidth,
-            top: (elementPos.y / 100) * canvasHeight,
-            angle: elementPos.angle || 0,
-            originX: 'left',
-            originY: 'top',
-            hasControls: false,
-            hasBorders: false,
-            selectable: true
-        });
-
-        secondaryActiveCanvas.add(text);
-        secondaryActiveCanvas.discardActiveObject();
-        secondaryActiveCanvas.renderAll();
-
-        // Advance to next element position
-        setCurrentElementIndex(prev => prev + 1);
+        return results;
     };
 
-    // Change font of the currently selected text object
-    const handleChangeFontOnSelected = async () => {
-        if (!secondaryActiveCanvas) return;
-        const obj = secondaryActiveCanvas.getActiveObject();
-        if (!obj || (obj.type !== 'i-text' && obj.type !== 'text')) {
-            alert('Please select a text object first.');
-            return;
-        }
-        await loadGoogleFont(textFont);
-        obj.set('fontFamily', textFont);
-        secondaryActiveCanvas.renderAll();
-    };
-
-    // Change color of the currently selected text object
-    const handleChangeColorOnSelected = (color) => {
-        setTextColor(color);
-        if (!secondaryActiveCanvas) return;
-        const obj = secondaryActiveCanvas.getActiveObject();
-        if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
-            obj.set('fill', color);
-            secondaryActiveCanvas.renderAll();
-        }
-    };
-
-    const handleSecondaryAddImage = () => {
-        if (!secondaryActiveCanvas) return;
-        const elementPos = getCurrentElementPosition();
-        if (!elementPos) {
-            alert('No more saved element positions available for this mesh.');
+    // Place an image on all meshes with a given tag
+    const handleGlobalImageUpload = (tag) => {
+        const positions = findTaggedPositions(tag);
+        if (positions.length === 0) {
+            alert(`No positions tagged as "${tag}" found in saved data.`);
             return;
         }
 
@@ -351,40 +322,109 @@ export default function SecondaryView({
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (f) => {
-                fabric.Image.fromURL(f.target.result, (img) => {
-                    const canvasWidth = secondaryActiveCanvas.width;
-                    const canvasHeight = secondaryActiveCanvas.height;
+                positions.forEach(({ meshName, element: elementPos }) => {
+                    const fCanvas = ensureCanvasForMesh(meshName);
+                    const canvasWidth = fCanvas.width;
+                    const canvasHeight = fCanvas.height;
 
-                    const targetW = (elementPos.w / 100) * canvasWidth;
-                    const targetH = (elementPos.h / 100) * canvasHeight;
+                    // Remove existing placeholder for this tag on this mesh
+                    const existing = fCanvas.getObjects().filter(obj => obj.elementTag === tag && obj.isDefaultPlaced);
+                    existing.forEach(obj => fCanvas.remove(obj));
 
-                    const scaleX = targetW / img.width;
-                    const scaleY = targetH / img.height;
+                    fabric.Image.fromURL(f.target.result, (img) => {
+                        const targetW = (elementPos.w / 100) * canvasWidth;
+                        const targetH = (elementPos.h / 100) * canvasHeight;
 
-                    img.set({
-                        scaleX: scaleX,
-                        scaleY: scaleY,
-                        left: (elementPos.x / 100) * canvasWidth,
-                        top: (elementPos.y / 100) * canvasHeight,
-                        angle: elementPos.angle || 0,
-                        originX: 'left',
-                        originY: 'top',
-                        hasControls: false,
-                        hasBorders: false,
-                        selectable: true
+                        // Apply the selected filter
+                        const filterName = tag === 'main_canvas_image' ? mainCanvasFilter : artistSignatureFilter;
+                        if (filterName && filterName !== 'none') {
+                            const filterInst = getFilterInstance(filterName);
+                            if (filterInst) {
+                                img.filters = [filterInst];
+                                img.applyFilters();
+                            }
+                        }
+
+                        img.set({
+                            scaleX: targetW / img.width,
+                            scaleY: targetH / img.height,
+                            left: (elementPos.x / 100) * canvasWidth,
+                            top: (elementPos.y / 100) * canvasHeight,
+                            angle: elementPos.angle || 0,
+                            originX: 'left',
+                            originY: 'top',
+                            hasControls: false,
+                            hasBorders: false,
+                            selectable: false,
+                            evented: false,
+                            isDefaultPlaced: true,
+                            elementTag: tag
+                        });
+
+                        fCanvas.add(img);
+                        fCanvas.discardActiveObject();
+                        fCanvas.renderAll();
                     });
-
-                    secondaryActiveCanvas.add(img);
-                    secondaryActiveCanvas.discardActiveObject();
-                    secondaryActiveCanvas.renderAll();
-
-                    // Advance to next element position
-                    setCurrentElementIndex(prev => prev + 1);
                 });
             };
             reader.readAsDataURL(file);
         };
         input.click();
+    };
+
+    // Place text on all meshes with a given tag
+    const handleGlobalTextApply = async (tag, textValue) => {
+        if (!textValue.trim()) {
+            alert('Please enter text first.');
+            return;
+        }
+
+        const positions = findTaggedPositions(tag);
+        if (positions.length === 0) {
+            alert(`No positions tagged as "${tag}" found in saved data.`);
+            return;
+        }
+
+        await loadGoogleFont(textFont);
+
+        positions.forEach(({ meshName, element: elementPos }) => {
+            const fCanvas = ensureCanvasForMesh(meshName);
+            const canvasWidth = fCanvas.width;
+            const canvasHeight = fCanvas.height;
+
+            // Remove existing default text for this tag on this mesh
+            const existing = fCanvas.getObjects().filter(obj => obj.elementTag === tag && obj.isDefaultPlaced);
+            existing.forEach(obj => fCanvas.remove(obj));
+
+            const text = new fabric.IText(textValue, {
+                fontFamily: textFont,
+                fill: textColor,
+                fontSize: 40
+            });
+
+            const targetW = (elementPos.w / 100) * canvasWidth;
+            const targetH = (elementPos.h / 100) * canvasHeight;
+
+            text.set({
+                scaleX: targetW / text.width,
+                scaleY: targetH / text.height,
+                left: (elementPos.x / 100) * canvasWidth,
+                top: (elementPos.y / 100) * canvasHeight,
+                angle: elementPos.angle || 0,
+                originX: 'left',
+                originY: 'top',
+                hasControls: false,
+                hasBorders: false,
+                selectable: false,
+                evented: false,
+                isDefaultPlaced: true,
+                elementTag: tag
+            });
+
+            fCanvas.add(text);
+            fCanvas.discardActiveObject();
+            fCanvas.renderAll();
+        });
     };
 
     const handleSecondaryDelete = () => {
@@ -396,13 +436,22 @@ export default function SecondaryView({
         }
     };
 
-    // Get saved meshes list and current element info (non-defaults only)
+    // Count tagged positions
     const savedMeshNames = loadedData ? Object.keys(loadedData) : [];
-    const currentElement = getCurrentElementPosition();
-    const nonDefaultElements = loadedData && selectedSecondaryMesh && loadedData[selectedSecondaryMesh]
-        ? loadedData[selectedSecondaryMesh].elements.filter(el => !el.isDefault)
-        : [];
-    const totalElements = nonDefaultElements.length;
+    const mainCanvasImageCount = findTaggedPositions('main_canvas_image').length;
+    const artistSignatureCount = findTaggedPositions('artist_signature').length;
+    const customerTextCount = findTaggedPositions('customer_text').length;
+    const customerNameCount = findTaggedPositions('customer_name').length;
+
+    const tagBtnStyle = (hasPositions) => ({
+        width: '100%', padding: '8px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+        backgroundColor: hasPositions ? '#333' : '#222',
+        color: hasPositions ? '#fff' : '#555',
+        border: `1px solid ${hasPositions ? '#555' : '#333'}`,
+        borderRadius: '5px', cursor: hasPositions ? 'pointer' : 'not-allowed',
+        fontSize: '0.85rem'
+    });
 
     return (
         <div style={{ flex: '1', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', backgroundColor: '#1a1a1a' }}>
@@ -466,9 +515,9 @@ export default function SecondaryView({
                             </span>
                         </div>
 
-                        {/* Mesh selector - only saved meshes */}
+                        {/* Mesh selector - for viewing */}
                         <div className="control-group" style={{ marginBottom: '15px' }}>
-                            <span className="control-label" style={{ display: 'block', marginBottom: '5px', color: '#fff' }}>Select Mesh:</span>
+                            <span className="control-label" style={{ display: 'block', marginBottom: '5px', color: '#fff' }}>View Mesh:</span>
                             <select
                                 value={selectedSecondaryMesh}
                                 onChange={(e) => setSelectedSecondaryMesh(e.target.value)}
@@ -480,110 +529,170 @@ export default function SecondaryView({
                             </select>
                         </div>
 
-                        {selectedSecondaryMesh && loadedData[selectedSecondaryMesh] && (
-                            <>
-                                {/* Show saved color */}
-                                <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#2a2a2a', borderRadius: '5px', border: '1px solid #444' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                                        <span style={{ fontSize: '0.85rem', color: '#aaa' }}>Mesh Color:</span>
-                                        <div style={{
-                                            width: '24px', height: '24px',
-                                            backgroundColor: loadedData[selectedSecondaryMesh].color,
-                                            borderRadius: '4px', border: '1px solid #666'
-                                        }} />
-                                        <span style={{ fontSize: '0.8rem', color: '#fff', fontFamily: 'monospace' }}>
-                                            {loadedData[selectedSecondaryMesh].color}
-                                        </span>
-                                    </div>
+                        {/* === 4 GLOBAL UPLOAD SLOTS === */}
+                        <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155' }}>
+                            <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#e2e8f0' }}>
+                                Global Content Uploads
+                            </h4>
+
+                            {/* 1. Main Canvas Image */}
+                            <div style={{ marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Main Canvas Image</span>
+                                    <span style={{ fontSize: '0.7rem', color: mainCanvasImageCount > 0 ? '#4ade80' : '#666', fontFamily: 'monospace' }}>
+                                        {mainCanvasImageCount} position(s)
+                                    </span>
                                 </div>
-
-                                {/* Element position queue info */}
-                                <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#2a2a2a', borderRadius: '5px', border: '1px solid #444' }}>
-                                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#aaa' }}>
-                                        Element Positions ({currentElementIndex}/{totalElements})
-                                    </h4>
-                                    {currentElement ? (
-                                        <div style={{ fontSize: '0.8rem', color: '#4ade80', fontFamily: 'monospace' }}>
-                                            <p style={{ margin: '3px 0' }}>Next: [{currentElement.type}] X: {currentElement.x}% | Y: {currentElement.y}%</p>
-                                            <p style={{ margin: '3px 0' }}>W: {currentElement.w}% | H: {currentElement.h}%</p>
-                                            {currentElement.text && (
-                                                <p style={{ margin: '3px 0' }}>Original text: "{currentElement.text}"</p>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>
-                                            {totalElements === 0 ? 'No elements saved for this mesh.' : 'All element positions used.'}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {currentElement && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
-                                        <button onClick={handleSecondaryAddImage} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '8px', backgroundColor: '#333', color: '#fff', border: '1px solid #555', borderRadius: '5px', cursor: 'pointer' }}>
-                                            <ImageIcon size={16} /> Add Image at Position {currentElementIndex + 1}
-                                        </button>
-
-                                        <div style={{ display: 'flex', gap: '5px' }}>
-                                            <input
-                                                type="text"
-                                                value={secondaryTextInput}
-                                                onChange={(e) => setSecondaryTextInput(e.target.value)}
-                                                placeholder="Enter text..."
-                                                style={{ flex: 1, padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px' }}
-                                            />
-                                            <button onClick={handleSecondaryAddText} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '8px', backgroundColor: '#333', color: '#fff', border: '1px solid #555', borderRadius: '5px', cursor: 'pointer' }}>
-                                                <Type size={16} /> Add Text
-                                            </button>
+                                <button
+                                    onClick={() => handleGlobalImageUpload('main_canvas_image')}
+                                    disabled={mainCanvasImageCount === 0}
+                                    style={tagBtnStyle(mainCanvasImageCount > 0)}
+                                >
+                                    <ImageIcon size={14} /> Upload Main Image
+                                </button>
+                                {mainCanvasImageCount > 0 && (
+                                    <div style={{ marginTop: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <SlidersHorizontal size={12} style={{ color: '#94a3b8' }} />
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Filter:</span>
+                                            <select
+                                                value={mainCanvasFilter}
+                                                onChange={(e) => setMainCanvasFilter(e.target.value)}
+                                                style={{ flex: 1, padding: '4px 6px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '4px', fontSize: '0.75rem' }}
+                                            >
+                                                {FILTER_OPTIONS.map(f => (
+                                                    <option key={f.value} value={f.value}>{f.label}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                 )}
+                            </div>
 
-                                {/* Text Font & Color Controls */}
-                                <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#2a2a2a', borderRadius: '5px', border: '1px solid #444' }}>
-                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#aaa' }}>
-                                        <Palette size={14} style={{ marginRight: '5px', verticalAlign: 'middle' }} />
-                                        Text Styling
-                                    </h4>
-
-                                    {/* Font Input */}
-                                    <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
-                                        <input
-                                            type="text"
-                                            value={textFont}
-                                            onChange={(e) => setTextFont(e.target.value)}
-                                            placeholder="Google Font name..."
-                                            style={{ flex: 1, padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px', fontSize: '0.85rem' }}
-                                        />
-                                        <button
-                                            onClick={handleChangeFontOnSelected}
-                                            style={{ flex: '0 0 auto', padding: '8px 12px', backgroundColor: '#6d28d9', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                                        >
-                                            Apply Font
-                                        </button>
+                            {/* 2. Artist Signature Image */}
+                            <div style={{ marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Artist Signature</span>
+                                    <span style={{ fontSize: '0.7rem', color: artistSignatureCount > 0 ? '#4ade80' : '#666', fontFamily: 'monospace' }}>
+                                        {artistSignatureCount} position(s)
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => handleGlobalImageUpload('artist_signature')}
+                                    disabled={artistSignatureCount === 0}
+                                    style={tagBtnStyle(artistSignatureCount > 0)}
+                                >
+                                    <PenTool size={14} /> Upload Artist Signature
+                                </button>
+                                {artistSignatureCount > 0 && (
+                                    <div style={{ marginTop: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <SlidersHorizontal size={12} style={{ color: '#94a3b8' }} />
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Filter:</span>
+                                            <select
+                                                value={artistSignatureFilter}
+                                                onChange={(e) => setArtistSignatureFilter(e.target.value)}
+                                                style={{ flex: 1, padding: '4px 6px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '4px', fontSize: '0.75rem' }}
+                                            >
+                                                {FILTER_OPTIONS.map(f => (
+                                                    <option key={f.value} value={f.value}>{f.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
+                                )}
+                            </div>
 
-                                    {/* Text Color */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Text Color:</span>
-                                        <input
-                                            type="color"
-                                            value={textColor}
-                                            onChange={(e) => handleChangeColorOnSelected(e.target.value)}
-                                            style={{ width: '36px', height: '36px', padding: '0', border: '1px solid #555', cursor: 'pointer', borderRadius: '5px' }}
-                                        />
-                                        <span style={{ fontSize: '0.8rem', color: '#fff', fontFamily: 'monospace' }}>{textColor}</span>
-                                    </div>
+                            {/* 3. Customer Text */}
+                            <div style={{ marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Customer Text</span>
+                                    <span style={{ fontSize: '0.7rem', color: customerTextCount > 0 ? '#4ade80' : '#666', fontFamily: 'monospace' }}>
+                                        {customerTextCount} position(s)
+                                    </span>
                                 </div>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                    <input
+                                        type="text"
+                                        value={customerText}
+                                        onChange={(e) => setCustomerText(e.target.value)}
+                                        placeholder="Enter customer text..."
+                                        disabled={customerTextCount === 0}
+                                        style={{ flex: 1, padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px', fontSize: '0.85rem' }}
+                                    />
+                                    <button
+                                        onClick={() => handleGlobalTextApply('customer_text', customerText)}
+                                        disabled={customerTextCount === 0}
+                                        style={{ ...tagBtnStyle(customerTextCount > 0), width: 'auto', padding: '8px 12px' }}
+                                    >
+                                        <Type size={14} /> Apply
+                                    </button>
+                                </div>
+                            </div>
 
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                    <button onClick={handleSecondaryDelete} title="Delete" style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                            {/* 4. Customer Name */}
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Customer Name</span>
+                                    <span style={{ fontSize: '0.7rem', color: customerNameCount > 0 ? '#4ade80' : '#666', fontFamily: 'monospace' }}>
+                                        {customerNameCount} position(s)
+                                    </span>
                                 </div>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                    <input
+                                        type="text"
+                                        value={customerName}
+                                        onChange={(e) => setCustomerName(e.target.value)}
+                                        placeholder="Enter customer name..."
+                                        disabled={customerNameCount === 0}
+                                        style={{ flex: 1, padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px', fontSize: '0.85rem' }}
+                                    />
+                                    <button
+                                        onClick={() => handleGlobalTextApply('customer_name', customerName)}
+                                        disabled={customerNameCount === 0}
+                                        style={{ ...tagBtnStyle(customerNameCount > 0), width: 'auto', padding: '8px 12px' }}
+                                    >
+                                        <User size={14} /> Apply
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-                                <div style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
-                                    <div ref={secondaryContainerRef} style={{ width: '300px', height: '300px' }}></div>
-                                </div>
-                            </>
-                        )}
+                        {/* Text Font & Color Controls */}
+                        <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#2a2a2a', borderRadius: '5px', border: '1px solid #444' }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#aaa' }}>
+                                <Palette size={14} style={{ marginRight: '5px', verticalAlign: 'middle' }} />
+                                Text Styling (for Customer Text & Name)
+                            </h4>
+
+                            {/* Font Input */}
+                            <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={textFont}
+                                    onChange={(e) => setTextFont(e.target.value)}
+                                    placeholder="Google Font name..."
+                                    style={{ flex: 1, padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px', fontSize: '0.85rem' }}
+                                />
+                            </div>
+
+                            {/* Text Color */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Text Color:</span>
+                                <input
+                                    type="color"
+                                    value={textColor}
+                                    onChange={(e) => setTextColor(e.target.value)}
+                                    style={{ width: '36px', height: '36px', padding: '0', border: '1px solid #555', cursor: 'pointer', borderRadius: '5px' }}
+                                />
+                                <span style={{ fontSize: '0.8rem', color: '#fff', fontFamily: 'monospace' }}>{textColor}</span>
+                            </div>
+                        </div>
+
+                        {/* Hidden canvas container for Fabric.js */}
+                        <div style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+                            <div ref={secondaryContainerRef} style={{ width: '300px', height: '300px' }}></div>
+                        </div>
                     </>
                 )}
             </div>

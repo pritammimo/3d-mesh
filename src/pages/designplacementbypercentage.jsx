@@ -133,6 +133,30 @@ export function Model({ url, file, textures, meshSettings, onMeshesExtracted }) 
 
 import SecondaryView from './SecondaryView';
 
+const FILTER_OPTIONS = [
+    { label: 'None', value: 'none' },
+    { label: 'Grayscale', value: 'grayscale' },
+    { label: 'Sepia', value: 'sepia' },
+    { label: 'Invert', value: 'invert' },
+    { label: 'Brightness (+)', value: 'brightness' },
+    { label: 'Contrast (+)', value: 'contrast' },
+    { label: 'Blur', value: 'blur' },
+    { label: 'Saturate', value: 'saturate' },
+];
+
+function getFilterInstance(filterName) {
+    switch (filterName) {
+        case 'grayscale': return new fabric.Image.filters.Grayscale();
+        case 'sepia': return new fabric.Image.filters.Sepia();
+        case 'invert': return new fabric.Image.filters.Invert();
+        case 'brightness': return new fabric.Image.filters.Brightness({ brightness: 0.3 });
+        case 'contrast': return new fabric.Image.filters.Contrast({ contrast: 0.3 });
+        case 'blur': return new fabric.Image.filters.Blur({ blur: 0.2 });
+        case 'saturate': return new fabric.Image.filters.Saturation({ saturation: 0.5 });
+        default: return null;
+    }
+}
+
 export default function DesignPlacementPercentage() {
     const [modelFile, setModelFile] = useState(null);
     const [meshes, setMeshes] = useState([]);
@@ -154,6 +178,15 @@ export default function DesignPlacementPercentage() {
 
     // Track if the currently selected object is marked as default
     const [isDefaultActive, setIsDefaultActive] = useState(false);
+    // Track the element tag/category of the selected object
+    const [activeElementTag, setActiveElementTag] = useState('');
+    // Track the type of the selected object ('text' or 'image')
+    const [activeObjectType, setActiveObjectType] = useState('');
+    // Text font and color for main canvas
+    const [mainTextFont, setMainTextFont] = useState('Arial');
+    const [mainTextColor, setMainTextColor] = useState('#1E90FF');
+    // Image filter for main canvas
+    const [mainImageFilter, setMainImageFilter] = useState('none');
 
     const handleModelUpload = (e) => {
         const file = e.target.files[0];
@@ -265,9 +298,23 @@ export default function DesignPlacementPercentage() {
 
                 // Read isDefault custom property
                 setIsDefaultActive(!!obj.isDefault);
+                setActiveElementTag(obj.elementTag || '');
+                setActiveObjectType((obj.type === 'i-text' || obj.type === 'text') ? 'text' : (obj.type === 'image' ? 'image' : ''));
+
+                // Read font/color from selected text
+                if (obj.type === 'i-text' || obj.type === 'text') {
+                    setMainTextFont(obj.fontFamily || 'Arial');
+                    setMainTextColor(obj.fill || '#1E90FF');
+                }
+                // Read filter from selected image
+                if (obj.type === 'image') {
+                    setMainImageFilter(obj.imageFilter || 'none');
+                }
             } else {
                 setActivePlacement(null);
                 setIsDefaultActive(false);
+                setActiveElementTag('');
+                setActiveObjectType('');
             }
         };
 
@@ -395,13 +442,14 @@ export default function DesignPlacementPercentage() {
                 w: Number(((objWidth / canvasWidth) * 100).toFixed(2)),
                 x: Number(((adjustedLeft / canvasWidth) * 100).toFixed(2)),
                 y: Number(((adjustedTop / canvasHeight) * 100).toFixed(2)),
-                isDefault: !!obj.isDefault
+                isDefault: !!obj.isDefault,
+                elementTag: obj.elementTag || ''
             };
 
             if (obj.type === 'i-text' || obj.type === 'text') {
-                return { ...base, type: 'text', text: obj.text };
+                return { ...base, type: 'text', text: obj.text, fontFamily: obj.fontFamily || 'Arial', fill: obj.fill || '#1E90FF' };
             } else if (obj.type === 'image') {
-                return { ...base, type: 'image' };
+                return { ...base, type: 'image', imageFilter: obj.imageFilter || 'none' };
             } else {
                 return { ...base, type: obj.type };
             }
@@ -471,6 +519,82 @@ export default function DesignPlacementPercentage() {
                             <button onClick={handleMainAddText} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '8px', backgroundColor: '#333', color: '#fff', border: '1px solid #555', borderRadius: '5px', cursor: 'pointer' }}><Type size={16} /> Add Text</button>
                         </div>
 
+                        {/* Text Font & Color - only when a text object is selected */}
+                        {activeObjectType === 'text' && (
+                            <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#1e293b', borderRadius: '5px', border: '1px solid #334155' }}>
+                                <span style={{ display: 'block', marginBottom: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>Text Font & Color:</span>
+                                <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
+                                    <input
+                                        type="text"
+                                        value={mainTextFont}
+                                        onChange={(e) => setMainTextFont(e.target.value)}
+                                        placeholder="Font name..."
+                                        style={{ flex: 1, padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px', fontSize: '0.85rem' }}
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (!mainActiveCanvas) return;
+                                            const obj = mainActiveCanvas.getActiveObject();
+                                            if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+                                                obj.set('fontFamily', mainTextFont);
+                                                mainActiveCanvas.renderAll();
+                                            }
+                                        }}
+                                        style={{ padding: '8px 12px', backgroundColor: '#6d28d9', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Color:</span>
+                                    <input
+                                        type="color"
+                                        value={mainTextColor}
+                                        onChange={(e) => {
+                                            setMainTextColor(e.target.value);
+                                            if (!mainActiveCanvas) return;
+                                            const obj = mainActiveCanvas.getActiveObject();
+                                            if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+                                                obj.set('fill', e.target.value);
+                                                mainActiveCanvas.renderAll();
+                                            }
+                                        }}
+                                        style={{ width: '36px', height: '36px', padding: '0', border: '1px solid #555', cursor: 'pointer', borderRadius: '5px' }}
+                                    />
+                                    <span style={{ fontSize: '0.8rem', color: '#fff', fontFamily: 'monospace' }}>{mainTextColor}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Image Filter - only when an image object is selected */}
+                        {activeObjectType === 'image' && (
+                            <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#1e293b', borderRadius: '5px', border: '1px solid #334155' }}>
+                                <span style={{ display: 'block', marginBottom: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>Image Filter:</span>
+                                <select
+                                    value={mainImageFilter}
+                                    onChange={(e) => {
+                                        const filterName = e.target.value;
+                                        setMainImageFilter(filterName);
+                                        if (!mainActiveCanvas) return;
+                                        const obj = mainActiveCanvas.getActiveObject();
+                                        if (obj && obj.type === 'image') {
+                                            obj.filters = [];
+                                            const filterInst = getFilterInstance(filterName);
+                                            if (filterInst) obj.filters.push(filterInst);
+                                            obj.applyFilters();
+                                            obj.imageFilter = filterName;
+                                            mainActiveCanvas.renderAll();
+                                        }
+                                    }}
+                                    style={{ width: '100%', padding: '8px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '5px' }}
+                                >
+                                    {FILTER_OPTIONS.map(f => (
+                                        <option key={f.value} value={f.value}>{f.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', padding: '10px', backgroundColor: '#222', borderRadius: '5px' }}>
                             <button onClick={handleMainDelete} title="Delete" style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
 
@@ -500,6 +624,69 @@ export default function DesignPlacementPercentage() {
                                 <input type="range" min="0" max="1" step="0.1" defaultValue="1" onChange={handleMainOpacityChange} />
                             </div>
                         </div>
+
+
+                        {/* Element Tag Checkboxes - only when isDefault is OFF */}
+                        {!isDefaultActive && activeObjectType && (
+                            <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#1e293b', borderRadius: '5px', border: '1px solid #334155' }}>
+                                <span style={{ display: 'block', marginBottom: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>Element Category:</span>
+                                {activeObjectType === 'image' ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
+                                            <input
+                                                type="radio"
+                                                name="elementTag"
+                                                checked={activeElementTag === 'main_canvas_image'}
+                                                onChange={() => {
+                                                    const obj = mainActiveCanvas?.getActiveObject();
+                                                    if (obj) { obj.elementTag = 'main_canvas_image'; setActiveElementTag('main_canvas_image'); }
+                                                }}
+                                            />
+                                            Main Canvas Image
+                                        </label>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
+                                            <input
+                                                type="radio"
+                                                name="elementTag"
+                                                checked={activeElementTag === 'artist_signature'}
+                                                onChange={() => {
+                                                    const obj = mainActiveCanvas?.getActiveObject();
+                                                    if (obj) { obj.elementTag = 'artist_signature'; setActiveElementTag('artist_signature'); }
+                                                }}
+                                            />
+                                            Artist Signature Image
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
+                                            <input
+                                                type="radio"
+                                                name="elementTag"
+                                                checked={activeElementTag === 'customer_text'}
+                                                onChange={() => {
+                                                    const obj = mainActiveCanvas?.getActiveObject();
+                                                    if (obj) { obj.elementTag = 'customer_text'; setActiveElementTag('customer_text'); }
+                                                }}
+                                            />
+                                            Customer Text
+                                        </label>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
+                                            <input
+                                                type="radio"
+                                                name="elementTag"
+                                                checked={activeElementTag === 'customer_name'}
+                                                onChange={() => {
+                                                    const obj = mainActiveCanvas?.getActiveObject();
+                                                    if (obj) { obj.elementTag = 'customer_name'; setActiveElementTag('customer_name'); }
+                                                }}
+                                            />
+                                            Customer Name
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div style={{ width: '100%', height: '300px', backgroundColor: '#fff', borderRadius: '5px', overflow: 'hidden', position: 'relative' }}>
                             <div ref={mainContainerRef} style={{ width: '100%', height: '100%' }}></div>
